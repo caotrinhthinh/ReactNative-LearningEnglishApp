@@ -25,6 +25,7 @@ export const vocabularyData: Vocabulary[] = [
     level: "basic",
     category: "Greetings",
   },
+  // Thêm nhiều từ vựng khác...
   {
     id: "4",
     vietnamese: "Tôi là sinh viên",
