@@ -1,14 +1,15 @@
-import { QuizScreen } from "@/src/screens/QuizScreen";
+import { RootStackParamList } from "@/types/navigation";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
+import Quiz from "./quiz";
 
-const Stack = createStackNavigator();
+const Stack = createStackNavigator<RootStackParamList>();
 
 const App = () => {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Home"
+        initialRouteName="index"
         screenOptions={{
           headerStyle: {
             backgroundColor: "#2196f3",
@@ -21,7 +22,7 @@ const App = () => {
       >
         <Stack.Screen
           name="Quiz"
-          component={QuizScreen}
+          component={Quiz}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
