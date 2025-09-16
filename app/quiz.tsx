@@ -1,23 +1,22 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  Alert,
-  Modal,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { QuizCard } from "../components/QuizCard";
 import { vocabularyData } from "../data/vocabulary";
 import { useQuiz } from "../hooks/useQuiz";
+import { Vocabulary } from "../types";
 
-export default function Quiz() {
-  const { quizType } = useLocalSearchParams<{
+const STORAGE_KEY = "@personal_vocabulary";
+
+export default function QuizScreen() {
+  const { quizType, usePersonal } = useLocalSearchParams<{ 
     quizType: "multiple-choice" | "typing";
+    usePersonal?: string;
   }>();
   const [showScoreModal, setShowScoreModal] = useState(false);
+  const [vocabularyList, setVocabularyList] = useState<Vocabulary[]>([]);
 
   const {
     questions,
@@ -29,13 +28,17 @@ export default function Quiz() {
     submitAnswer,
     resetQuiz,
     getResult,
-  } = useQuiz(vocabularyData);
+  } = useQuiz(vocabularyList, vocabularyData);
 
   useEffect(() => {
-    if (quizType) {
+    loadVocabularyData();
+  }, []);
+
+  useEffect(() => {
+    if (quizType && vocabularyList.length > 0) {
       generateQuestions(quizType);
     }
-  }, [quizType]);
+  }, [quizType, vocabularyList]);
 
   useEffect(() => {
     if (isQuizCompleted) {
@@ -43,7 +46,37 @@ export default function Quiz() {
     }
   }, [isQuizCompleted]);
 
-  if (!currentQuestion) {
+  const loadVocabularyData = async () => {
+    try {
+      if (usePersonal === "true") {
+        // Load personal vocabulary
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const personalVocab: Vocabulary[] = JSON.parse(stored);
+          setVocabularyList(personalVocab);
+        } else {
+          Alert.alert(
+            "Thông báo", 
+            "Bạn chưa có từ vựng cá nhân nào. Sẽ sử dụng từ vựng mặc định.",
+            [
+              {
+                text: "OK",
+                onPress: () => setVocabularyList(vocabularyData)
+              }
+            ]
+          );
+        }
+      } else {
+        // Use default vocabulary
+        setVocabularyList(vocabularyData);
+      }
+    } catch (error) {
+      console.error("Lỗi khi tải từ vựng:", error);
+      setVocabularyList(vocabularyData);
+    }
+  };
+
+  if (!currentQuestion || vocabularyList.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -89,27 +122,35 @@ export default function Quiz() {
         <TouchableOpacity onPress={handleExit} style={styles.exitButton}>
           <Text style={styles.exitButtonText}>✕</Text>
         </TouchableOpacity>
-        <Text style={styles.progressText}>
-          Câu {currentQuestionIndex + 1} / {questions.length}
-        </Text>
+        <View style={styles.headerInfo}>
+          <Text style={styles.progressText}>
+            Câu {currentQuestionIndex + 1} / {questions.length}
+          </Text>
+          {usePersonal === "true" && (
+            <Text style={styles.personalLabel}>Từ vựng cá nhân</Text>
+          )}
+        </View>
       </View>
 
       <View style={styles.progressBar}>
-        <View
+        <View 
           style={[
-            styles.progressFill,
-            {
-              width: `${
-                ((currentQuestionIndex + 1) / questions.length) * 100
-              }%`,
-            },
-          ]}
+            styles.progressFill, 
+            { width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }
+          ]} 
         />
       </View>
 
-      <QuizCard question={currentQuestion} onSubmit={submitAnswer} />
+      <QuizCard 
+        question={currentQuestion} 
+        onSubmit={submitAnswer}
+      />
 
-      <Modal visible={showScoreModal} transparent={true} animationType="fade">
+      <Modal
+        visible={showScoreModal}
+        transparent={true}
+        animationType="fade"
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Kết quả Quiz</Text>
@@ -119,7 +160,7 @@ export default function Quiz() {
             <Text style={styles.percentageText}>
               {Math.round((result.score / result.total) * 100)}%
             </Text>
-
+            
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.restartButton]}
@@ -127,7 +168,7 @@ export default function Quiz() {
               >
                 <Text style={styles.modalButtonText}>Làm lại</Text>
               </TouchableOpacity>
-
+              
               <TouchableOpacity
                 style={[styles.modalButton, styles.homeButton]}
                 onPress={handleGoHome}
@@ -176,10 +217,19 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
+  headerInfo: {
+    alignItems: "center",
+  },
   progressText: {
     fontSize: 16,
     fontWeight: "600",
     color: "#1976d2",
+  },
+  personalLabel: {
+    fontSize: 12,
+    color: "#4caf50",
+    fontWeight: "500",
+    marginTop: 2,
   },
   progressBar: {
     height: 4,

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { QuizQuestion, QuizResult, Vocabulary } from "../types";
 
-export const useQuiz = (vocabularyList: Vocabulary[]) => {
+export const useQuiz = (vocabularyList: Vocabulary[], defaultVocabulary?: Vocabulary[]) => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -15,20 +15,50 @@ export const useQuiz = (vocabularyList: Vocabulary[]) => {
     const quizQuestion: QuizQuestion[] = selectedWords.map((word) => {
       if (type === "multiple-choice") {
         // Tạo câu hỏi trắc nghiệm
-        const wrongOptions = vocabularyList
+        let availableWords = vocabularyList;
+        
+        // Nếu từ vựng cá nhân ít hơn 4 từ, bổ sung từ vựng mặc định
+        if (vocabularyList.length < 4 && defaultVocabulary) {
+          // Lọc ra những từ vựng mặc định không trùng với từ vựng cá nhân
+          const personalEnglishWords = vocabularyList.map(v => v.english.toLowerCase());
+          const additionalWords = defaultVocabulary.filter(
+            v => !personalEnglishWords.includes(v.english.toLowerCase())
+          );
+          availableWords = [...vocabularyList, ...additionalWords];
+        }
+
+        const wrongOptions = availableWords
           .filter((w) => w.id !== word.id)
           .sort(() => 0.5 - Math.random())
           .slice(0, 3)
           .map((w) => w.english);
 
-        const options = [...wrongOptions, word.english].sort(
-          () => 0.5 - Math.random()
-        );
+        // Nếu vẫn không đủ 3 lựa chọn sai, lặp lại từ vựng
+        let finalOptions = [...wrongOptions, word.english];
+        let attempts = 0;
+        while (finalOptions.length < 4 && attempts < 50) {
+          const randomWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+          if (randomWord.english !== word.english && !finalOptions.includes(randomWord.english)) {
+            finalOptions.push(randomWord.english);
+          }
+          attempts++;
+        }
+        
+        // Nếu vẫn không đủ 4 lựa chọn, thêm các từ trùng lặp
+        while (finalOptions.length < 4) {
+          const randomWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+          if (randomWord.english !== word.english) {
+            finalOptions.push(randomWord.english);
+          }
+        }
+
+        const options = finalOptions.sort(() => 0.5 - Math.random());
+        
         return {
           id: word.id,
           question: `"${word.vietnamese}" có nghĩa tiếng anh là gì?`,
           correctAnswer: word.english,
-          options: options,
+          options: options.slice(0, 4), // Đảm bảo chỉ có 4 lựa chọn
           type: "multiple-choice",
         };
       } else {
